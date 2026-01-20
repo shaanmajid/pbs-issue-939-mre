@@ -1,3 +1,5 @@
+# [astral-sh/python-build-standalone#939](https://github.com/astral-sh/python-build-standalone/issues/939) MRE
+
 Minimal repro for python-build-standalone (PBS) Tcl/Tk `init.tcl` failures on
 macOS. 
 
