@@ -63,6 +63,11 @@ uvx --python=3.14.2 --with-requirements requirements.txt python -m pytest -q -s 
 
 ## CI
 
-One job per case on macOS, plus small Linux and Windows probes.
-Linux and Windows pass under the same stdin conditions (so far).
-Expected‑fail cases fail the job, so the workflow is intentionally red.
+The workflow now builds `python-build-standalone` from two refs on macOS for
+Python 3.10-3.14:
+- `astral-sh/python-build-standalone@main` (expected to fail the MRE)
+- `shaanmajid/python-build-standalone@fix/tkinter-tcl-library-env` (expected to pass)
+
+Each matrix job compiles PBS, creates a venv from the built Python, verifies the
+two trigger conditions (`sys.prefix != sys.base_prefix` and non-TTY char-device
+stdin), then runs `mre.py < /dev/null` and asserts the expected outcome.

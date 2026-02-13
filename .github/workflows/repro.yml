@@ -5,338 +5,159 @@ on:
   workflow_dispatch:
 
 jobs:
-  macos-direct-venv-stdin-devnull-312:
-    name: macOS / direct / venv / stdin=/dev/null / py3.12 (expect FAIL)
+  pbs-build-matrix:
+    name: ${{ matrix.pbs.id }} / py${{ matrix.python-version }} / expect-${{ matrix.pbs.expect }}
     runs-on: macos-14
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        pbs:
+          - id: upstream-main
+            repository: astral-sh/python-build-standalone
+            ref: main
+            expect: fail
+          - id: fix-branch
+            repository: shaanmajid/python-build-standalone
+            ref: fix/tkinter-tcl-library-env
+            expect: pass
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
-      - name: Install managed Python
-        env:
-          UV_MANAGED_PYTHON: "1"
-        run: uv python install 3.12
-      - name: direct / venv / stdin=/dev/null / py3.12 (expect FAIL)
-        env:
-          UV_MANAGED_PYTHON: "1"
-        run: |
-          set +e
-          uvx --python=3.12 python mre.py < /dev/null
-          status=$?
-          exit $status
 
-  macos-direct-venv-stdin-devnull-313:
-    name: macOS / direct / venv / stdin=/dev/null / py3.13 (expect FAIL)
-    runs-on: macos-14
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
-      - name: Install managed Python
-        env:
-          UV_MANAGED_PYTHON: "1"
-        run: uv python install 3.13
-      - name: direct / venv / stdin=/dev/null / py3.13 (expect FAIL)
-        env:
-          UV_MANAGED_PYTHON: "1"
-        run: |
-          set +e
-          uvx --python=3.13 python mre.py < /dev/null
-          status=$?
-          exit $status
+      - name: Checkout python-build-standalone
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ matrix.pbs.repository }}
+          ref: ${{ matrix.pbs.ref }}
+          path: pbs
+          fetch-depth: 1
 
-  macos-direct-venv-stdin-devnull:
-    name: macOS / direct / venv / stdin=/dev/null (expect FAIL)
-    runs-on: macos-14
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
-      - name: Install managed Python
-        env:
-          UV_MANAGED_PYTHON: "1"
-        run: uv python install 3.14.2
-      - name: direct / venv / stdin=/dev/null (expect FAIL)
-        env:
-          UV_MANAGED_PYTHON: "1"
-        run: |
-          set +e
-          uvx --python=3.14.2 python mre.py < /dev/null
-          status=$?
-          exit $status
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v3
 
-  macos-direct-venv-stdin-devzero:
-    name: macOS / direct / venv / stdin=/dev/zero (expect FAIL)
-    runs-on: macos-14
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
-      - name: Install managed Python
-        env:
-          UV_MANAGED_PYTHON: "1"
-        run: uv python install 3.14.2
-      - name: direct / venv / stdin=/dev/zero (expect FAIL)
-        env:
-          UV_MANAGED_PYTHON: "1"
-        run: |
-          set +e
-          uvx --python=3.14.2 python mre.py < /dev/zero
-          status=$?
-          exit $status
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
 
-  macos-direct-venv-stdin-fifo:
-    name: macOS / direct / venv / stdin=pipe (expect PASS)
-    runs-on: macos-14
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
-      - name: Install managed Python
-        env:
-          UV_MANAGED_PYTHON: "1"
-        run: uv python install 3.14.2
-      - name: direct / venv / stdin=pipe (expect PASS)
-        env:
-          UV_MANAGED_PYTHON: "1"
+      - name: Print build tool versions
         run: |
-          printf '' | uvx --python=3.14.2 python mre.py
+          set -euxo pipefail
+          sw_vers
+          uv --version
+          rustc --version
+          cargo --version
 
-  macos-direct-venv-stdin-regular:
-    name: macOS / direct / venv / stdin=regular (expect PASS)
-    runs-on: macos-14
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
-      - name: Install managed Python
-        env:
-          UV_MANAGED_PYTHON: "1"
-        run: uv python install 3.14.2
-      - name: direct / venv / stdin=regular file (expect PASS)
-        env:
-          UV_MANAGED_PYTHON: "1"
+      - name: Build python-build-standalone
+        working-directory: pbs
         run: |
-          tmpfile=$(mktemp)
-          uvx --python=3.14.2 python mre.py < "$tmpfile"
-          rm -f "$tmpfile"
+          set -euxo pipefail
+          ./build.py \
+            --target-triple aarch64-apple-darwin \
+            --python cpython-${{ matrix.python-version }} \
+            --options noopt
 
-  macos-direct-venv-tty:
-    name: macOS / direct / venv / TTY (expect PASS)
-    runs-on: macos-14
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
-      - name: Install managed Python
-        env:
-          UV_MANAGED_PYTHON: "1"
-        run: uv python install 3.14.2
-      - name: direct / venv / TTY (expect PASS)
-        env:
-          UV_MANAGED_PYTHON: "1"
+      - name: Prepare built Python
         run: |
-          script -q /dev/null /bin/sh -c "uvx --python=3.14.2 python mre.py"
-
-  macos-direct-venv-tty-stdin-devnull:
-    name: macOS / direct / venv / TTY + stdin=/dev/null (expect FAIL)
-    runs-on: macos-14
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
-      - name: Install managed Python
-        env:
-          UV_MANAGED_PYTHON: "1"
-        run: uv python install 3.14.2
-      - name: direct / venv / TTY + stdin=/dev/null (expect FAIL)
-        env:
-          UV_MANAGED_PYTHON: "1"
-        run: |
-          set +e
-          script -q /dev/null /bin/sh -c "uvx --python=3.14.2 python mre.py < /dev/null"
-          status=$?
-          exit $status
-
-  macos-direct-baseprefix-stdin-devnull:
-    name: macOS / direct / base_prefix / stdin=/dev/null (expect PASS)
-    runs-on: macos-14
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
-      - name: Install managed Python
-        env:
-          UV_MANAGED_PYTHON: "1"
-        run: uv python install 3.14.2
-      - name: direct / base_prefix / stdin=/dev/null (expect PASS)
-        env:
-          UV_MANAGED_PYTHON: "1"
-        run: |
-          base_prefix=$(uvx --python=3.14.2 python -c "import sys; print(sys.base_prefix)")
-          "$base_prefix/bin/python" mre.py < /dev/null
-
-  macos-direct-venv-devnull-with-tcl:
-    name: macOS / direct / venv / stdin=/dev/null + TCL_LIBRARY (expect PASS)
-    runs-on: macos-14
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
-      - name: Install managed Python
-        env:
-          UV_MANAGED_PYTHON: "1"
-        run: uv python install 3.14.2
-      - name: direct / venv / stdin=/dev/null + TCL_LIBRARY (expect PASS)
-        env:
-          UV_MANAGED_PYTHON: "1"
-        run: |
-          base_prefix=$(uvx --python=3.14.2 python -c "import sys; print(sys.base_prefix)")
-          TCL_LIBRARY="$base_prefix/lib/tcl9.0" uvx --python=3.14.2 python mre.py < /dev/null
-
-  macos-pytest-capture-stdin-devnull:
-    name: macOS / pytest / capture / stdin=/dev/null (expect FAIL)
-    runs-on: macos-14
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
-      - name: Install managed Python
-        env:
-          UV_MANAGED_PYTHON: "1"
-        run: uv python install 3.14.2
-      - name: pytest / capture / stdin=/dev/null (expect FAIL)
-        env:
-          UV_MANAGED_PYTHON: "1"
-        run: |
-          set +e
-          PBS_TK_LOG=pytest-capture-stdin-devnull.log \
-            uvx --python=3.14.2 --with-requirements requirements.txt \
-            python -m pytest -q test_issue.py < /dev/null
-          status=$?
-          if [ -f pytest-capture-stdin-devnull.log ]; then
-            cat pytest-capture-stdin-devnull.log
+          set -euxo pipefail
+          dist_archive=$(find pbs/dist -maxdepth 1 -type f -name '*.tar.zst' | head -n 1)
+          if [ -z "${dist_archive}" ]; then
+            echo "No built archive found in pbs/dist/"
+            exit 1
           fi
-          exit $status
+          echo "dist_archive=${dist_archive}" >> "$GITHUB_ENV"
 
-  macos-pytest-capture-stdin-fifo:
-    name: macOS / pytest / capture / stdin=pipe (expect FAIL)
-    runs-on: macos-14
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
-      - name: Install managed Python
-        env:
-          UV_MANAGED_PYTHON: "1"
-        run: uv python install 3.14.2
-      - name: pytest / capture / stdin=pipe (expect FAIL)
-        env:
-          UV_MANAGED_PYTHON: "1"
+          extract_root="$RUNNER_TEMP/pbs-dist"
+          rm -rf "$extract_root"
+          mkdir -p "$extract_root"
+          tar --zstd -xf "${dist_archive}" -C "$extract_root"
+
+          python_bin="$extract_root/python/install/bin/python3"
+          if [ ! -x "$python_bin" ]; then
+            echo "Expected built Python at $python_bin, but it is missing."
+            find "$extract_root" -maxdepth 4 -type f | sed -n '1,200p'
+            exit 1
+          fi
+          echo "python_bin=${python_bin}" >> "$GITHUB_ENV"
+
+          venv_dir="$RUNNER_TEMP/mre-venv"
+          rm -rf "$venv_dir"
+          "$python_bin" -m venv "$venv_dir"
+          echo "venv_python=$venv_dir/bin/python" >> "$GITHUB_ENV"
+
+      - name: Verify trigger conditions
         run: |
-          set +e
-          PBS_TK_LOG=pytest-capture-stdin-fifo.log \
-            uvx --python=3.14.2 --with-requirements requirements.txt \
-            python -m pytest -q test_issue.py <<'PY'
+          set -euxo pipefail
+          "$venv_python" - <<'PY' < /dev/null
+          import os
+          import stat
+          import sys
+
+          if sys.prefix == sys.base_prefix:
+              raise SystemExit(
+                  f"Expected sys.prefix != sys.base_prefix; got {sys.prefix!r} == {sys.base_prefix!r}"
+              )
+
+          stdin_mode = os.fstat(0).st_mode
+          if not stat.S_ISCHR(stdin_mode):
+              raise SystemExit(f"Expected stdin to be a character device; mode={oct(stdin_mode)}")
+          if os.isatty(0):
+              raise SystemExit("Expected stdin to be non-TTY")
+
+          print("Trigger conditions satisfied.")
+          print(f"prefix={sys.prefix}")
+          print(f"base_prefix={sys.base_prefix}")
+          print(f"stdin_mode={oct(stdin_mode)}")
+          print(f"stdin_isatty={os.isatty(0)}")
           PY
-          status=$?
-          if [ -f pytest-capture-stdin-fifo.log ]; then
-            cat pytest-capture-stdin-fifo.log
-          fi
-          exit $status
 
-  macos-pytest-nocapture-stdin-fifo:
-    name: macOS / pytest / -s / stdin=pipe (expect PASS)
-    runs-on: macos-14
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
-      - name: Install managed Python
-        env:
-          UV_MANAGED_PYTHON: "1"
-        run: uv python install 3.14.2
-      - name: pytest / -s / stdin=pipe (expect PASS)
-        env:
-          UV_MANAGED_PYTHON: "1"
+      - name: Run MRE and assert expected behavior
+        id: assert
         run: |
-          PBS_TK_LOG=pytest-nocapture-stdin-fifo.log \
-            uvx --python=3.14.2 --with-requirements requirements.txt \
-            python -m pytest -q -s test_issue.py <<'PY'
-          PY
-          if [ -f pytest-nocapture-stdin-fifo.log ]; then
-            cat pytest-nocapture-stdin-fifo.log
-          fi
-
-  macos-pytest-nocapture-stdin-devnull:
-    name: macOS / pytest / -s / stdin=/dev/null (expect FAIL)
-    runs-on: macos-14
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
-      - name: Install managed Python
-        env:
-          UV_MANAGED_PYTHON: "1"
-        run: uv python install 3.14.2
-      - name: pytest / -s / stdin=/dev/null (expect FAIL)
-        env:
-          UV_MANAGED_PYTHON: "1"
-        run: |
+          set -o pipefail
           set +e
-          PBS_TK_LOG=pytest-nocapture-stdin-devnull.log \
-            uvx --python=3.14.2 --with-requirements requirements.txt \
-            python -m pytest -q -s test_issue.py < /dev/null
-          status=$?
-          if [ -f pytest-nocapture-stdin-devnull.log ]; then
-            cat pytest-nocapture-stdin-devnull.log
-          fi
-          exit $status
+          "$venv_python" "$GITHUB_WORKSPACE/mre.py" < /dev/null 2>&1 | tee "$RUNNER_TEMP/mre.log"
+          status=${PIPESTATUS[0]}
+          set -e
 
-  linux-direct-venv-stdin-devnull:
-    name: Linux / direct / venv / stdin=/dev/null (expect PASS)
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
-      - name: Install xvfb
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y xvfb
-      - name: Install managed Python
-        env:
-          UV_MANAGED_PYTHON: "1"
-        run: uv python install 3.14.2
-      - name: direct / venv / stdin=/dev/null (expect PASS on Linux)
-        env:
-          UV_MANAGED_PYTHON: "1"
-        run: |
-          xvfb-run -a uvx --python=3.14.2 python mre.py < /dev/null
+          echo "mre_exit_code=$status" >> "$GITHUB_OUTPUT"
 
-  linux-pytest-capture-stdin-devnull:
-    name: Linux / pytest / capture / stdin=/dev/null (expect PASS)
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
-      - name: Install xvfb
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y xvfb
-      - name: Install managed Python
-        env:
-          UV_MANAGED_PYTHON: "1"
-        run: uv python install 3.14.2
-      - name: pytest / capture / stdin=/dev/null (expect PASS on Linux)
-        env:
-          UV_MANAGED_PYTHON: "1"
-        run: |
-          PBS_TK_LOG=pytest-capture-stdin-devnull.log \
-            xvfb-run -a uvx --python=3.14.2 --with-requirements requirements.txt \
-            python -m pytest -q test_issue.py < /dev/null
-          if [ -f pytest-capture-stdin-devnull.log ]; then
-            cat pytest-capture-stdin-devnull.log
+          if [ "${{ matrix.pbs.expect }}" = "fail" ]; then
+            if [ "$status" -eq 0 ]; then
+              echo "Expected MRE failure for ${{ matrix.pbs.repository }}@${{ matrix.pbs.ref }}, but it succeeded."
+              exit 1
+            fi
+            echo "Observed expected failure."
+          else
+            if [ "$status" -ne 0 ]; then
+              echo "Expected MRE success for ${{ matrix.pbs.repository }}@${{ matrix.pbs.ref }}, but it failed."
+              exit 1
+            fi
+            echo "Observed expected success."
           fi
 
-  windows-direct-venv-stdin-nul:
-    name: Windows / direct / venv / stdin=NUL (expect PASS)
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
-      - name: Install managed Python
-        env:
-          UV_MANAGED_PYTHON: "1"
-        run: uv python install 3.14.2
-      - name: direct / venv / stdin=NUL
-        env:
-          UV_MANAGED_PYTHON: "1"
-        shell: cmd
+      - name: Upload MRE log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mre-log-${{ matrix.pbs.id }}-py${{ matrix.python-version }}
+          path: ${{ runner.temp }}/mre.log
+          if-no-files-found: warn
+
+      - name: Write step summary
+        if: always()
         run: |
-          uvx --python=3.14.2 python mre.py < NUL
+          if [ "${{ steps.assert.outcome }}" = "success" ]; then
+            assertion="matched expected behavior"
+          else
+            assertion="did not match expected behavior"
+          fi
+
+          {
+            echo "### PBS build + MRE result"
+            echo ""
+            echo "- Python version: \`${{ matrix.python-version }}\`"
+            echo "- PBS source: \`${{ matrix.pbs.repository }}@${{ matrix.pbs.ref }}\`"
+            echo "- Expected MRE result: \`${{ matrix.pbs.expect }}\`"
+            echo "- MRE exit code: \`${{ steps.assert.outputs.mre_exit_code || 'n/a' }}\`"
+            echo "- Assertion: \`${assertion}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
