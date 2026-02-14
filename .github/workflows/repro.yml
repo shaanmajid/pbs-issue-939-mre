@@ -87,7 +87,7 @@ jobs:
       - name: Verify trigger conditions
         run: |
           set -euxo pipefail
-          "$venv_python" - <<'PY' < /dev/null
+          "$venv_python" -c '
           import os
           import stat
           import sys
@@ -108,14 +108,14 @@ jobs:
           print(f"base_prefix={sys.base_prefix}")
           print(f"stdin_mode={oct(stdin_mode)}")
           print(f"stdin_isatty={os.isatty(0)}")
-          PY
+          ' < /dev/null
 
       - name: Run MRE and assert expected behavior
         id: assert
         run: |
           set -o pipefail
           set +e
-          "$venv_python" "$GITHUB_WORKSPACE/mre.py" < /dev/null 2>&1 | tee "$RUNNER_TEMP/mre.log"
+          "$venv_python" "$GITHUB_WORKSPACE/mre.py" 2>&1 | tee "$RUNNER_TEMP/mre.log"
           status=${PIPESTATUS[0]}
           set -e
 
